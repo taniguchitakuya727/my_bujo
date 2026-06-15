@@ -54,6 +54,14 @@
     color: var(--paper);
   }
   .logo span { color: #8ab4e0; }
+  .build-time {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: #8a8070;
+    letter-spacing: .03em;
+    align-self: flex-end;
+    padding-bottom: 1px;
+  }
   .date-display {
     font-family: 'JetBrains Mono', monospace;
     font-size: 11px;
@@ -833,6 +841,7 @@
 <header>
   <div class="header-top">
     <div class="logo">BuJo<span>.</span></div>
+    <div class="build-time">built 2026.06.15 10:56</div>
     <div class="date-display" id="headerDate"></div>
   </div>
   <nav>
@@ -999,7 +1008,7 @@ function doGet(e) {
   try {
     // payloadパラメータ経由でJSONを受け取る
     const raw = e.parameter.payload;
-    const b   = raw ? JSON.parse(decodeURIComponent(escape(Utilities.base64Decode(raw, Utilities.Charset.UTF_8).join('')))) : {};
+    const b   = raw ? JSON.parse(Utilities.newBlob(Utilities.base64Decode(raw)).getDataAsString()) : {};
     const act = b.action || e.parameter.action;
 
     if (act === 'test')        return res({ok: true});
@@ -1027,17 +1036,36 @@ function getSheet(name) {
 
 function readData() {
   const entries = [], habits = [], habitLogs = [];
-  const er = getSheet('entries').getDataRange().getValues();
-  for (let i = 1; i < er.length; i++) {
-    if (er[i][0]) entries.push({id:er[i][0], date:er[i][1], sym:er[i][2], text:er[i][3], state:er[i][4]});
+  const es = getSheet('entries');
+  if (es.getLastRow() > 1) {
+    const er = es.getDataRange().getValues();
+    for (let i = 1; i < er.length; i++) {
+      if (er[i][0]) entries.push({
+        id: String(er[i][0]),
+        date: String(er[i][1]),
+        sym: String(er[i][2]),
+        text: String(er[i][3]),
+        state: String(er[i][4])
+      });
+    }
   }
-  const hr = getSheet('habits').getDataRange().getValues();
-  for (let i = 1; i < hr.length; i++) {
-    if (hr[i][0]) habits.push({id:hr[i][0], name:hr[i][1]});
+  const hs = getSheet('habits');
+  if (hs.getLastRow() > 1) {
+    const hr = hs.getDataRange().getValues();
+    for (let i = 1; i < hr.length; i++) {
+      if (hr[i][0]) habits.push({id: String(hr[i][0]), name: String(hr[i][1])});
+    }
   }
-  const lr = getSheet('habit_logs').getDataRange().getValues();
-  for (let i = 1; i < lr.length; i++) {
-    if (lr[i][0]) habitLogs.push({habitId:lr[i][0], date:lr[i][1], checked:lr[i][2]});
+  const ls = getSheet('habit_logs');
+  if (ls.getLastRow() > 1) {
+    const lr = ls.getDataRange().getValues();
+    for (let i = 1; i < lr.length; i++) {
+      if (lr[i][0]) habitLogs.push({
+        habitId: String(lr[i][0]),
+        date: String(lr[i][1]),
+        checked: lr[i][2] === true || lr[i][2] === 'true'
+      });
+    }
   }
   return {entries, habits, habitLogs};
 }
@@ -1160,13 +1188,25 @@ async function syncAll() {
   btn.classList.add('spinning');
   try {
     const data = await gasGet({action:'read'});
-    state.entries   = data.entries   || [];
-    state.habits    = data.habits    || [];
-    state.habitLogs = data.habitLogs || [];
+
+    // GASがerrorを返した場合はローカルデータを保持
+    if (data.error) {
+      setStatus('dailyStatus', '⚠ GASエラー: ' + data.error, 'err');
+      return;
+    }
+
+    // GASから有効なデータが返ってきた場合のみ上書き
+    // entries/habits/habitLogsそれぞれ、配列として返ってきたときだけ反映
+    if (Array.isArray(data.entries))   state.entries   = data.entries;
+    if (Array.isArray(data.habits))    state.habits    = data.habits;
+    if (Array.isArray(data.habitLogs)) state.habitLogs = data.habitLogs;
+
     saveLocal();
     renderAll();
-    setStatus('dailyStatus','✓ 同期しました','ok');
-    setTimeout(()=>setStatus('dailyStatus','',''),2000);
+
+    const count = (state.entries?.length || 0);
+    setStatus('dailyStatus', `✓ 同期しました（エントリ ${count}件）`, 'ok');
+    setTimeout(()=>setStatus('dailyStatus','',''), 3000);
   } catch(e) {
     setStatus('dailyStatus','⚠ 同期失敗: '+e.message,'err');
   } finally {
@@ -1658,7 +1698,14 @@ function init() {
 
   state.viewMonth = monthStr(now);
 
+  // まずローカルデータで即表示
   renderAll();
+
+  // GAS設定済みなら起動時に自動同期（バックグラウンド）
+  if (state.gasUrl) {
+    setStatus('dailyStatus', '同期中...', 'loading');
+    syncAll();
+  }
 
   // habit modal
   document.getElementById('habitNameInput').addEventListener('keydown', e => {
