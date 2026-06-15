@@ -531,6 +531,12 @@
   }
   .config-save:hover { background: #1e3f63; }
 
+  .config-section .status-bar {
+    margin-top: 8px;
+    text-align: left;
+    padding: 0 2px;
+  }
+
   .status-bar {
     font-family: 'JetBrains Mono', monospace;
     font-size: 11px;
@@ -920,6 +926,7 @@
         <input class="config-input" id="cfgUrl" placeholder="https://script.google.com/macros/s/..." type="url">
       </div>
       <button class="config-save" onclick="saveConfig()">保存して接続テスト</button>
+      <div class="status-bar" id="settingsStatus"></div>
     </div>
 
     <div class="config-section">
@@ -932,12 +939,25 @@
         <p>5. アクセス権: <strong>全員</strong> に設定</p>
         <p>6. 発行されたURLをここに貼り付け</p>
       </div>
-      <div style="margin-top:12px; background: var(--ink); border-radius: 4px; padding: 12px; font-family: 'JetBrains Mono',monospace; font-size:11px; color: #8ab4e0; overflow-x:auto; -webkit-overflow-scrolling:touch;">
-        <pre id="gasCodeBlock"></pre>
+      <div style="margin-top:12px; position:relative;">
+        <div style="background: var(--ink); border-radius: 4px; padding: 12px 12px 12px; font-family: 'JetBrains Mono',monospace; font-size:11px; color: #8ab4e0; overflow-x:auto; -webkit-overflow-scrolling:touch;">
+          <pre id="gasCodeBlock"></pre>
+        </div>
+        <button id="copyGasBtn" onclick="copyGasCode()" style="
+          position:absolute; top:8px; right:8px;
+          background: rgba(255,255,255,0.12);
+          color: #c8d8e8;
+          border: 1px solid rgba(255,255,255,0.2);
+          border-radius: 4px;
+          padding: 4px 10px;
+          font-family: 'JetBrains Mono', monospace;
+          font-size: 10px;
+          cursor: pointer;
+          transition: background .15s;
+          backdrop-filter: blur(4px);
+        ">コピー</button>
       </div>
     </div>
-
-    <div class="status-bar" id="settingsStatus"></div>
   </div>
 </main>
 
@@ -971,24 +991,28 @@
 
 <script>
 // ─── GAS Code to show in settings ───────────────────────────
-document.getElementById('gasCodeBlock').textContent = `const SS = SpreadsheetApp.getActiveSpreadsheet();
+document.getElementById('gasCodeBlock').textContent = `// ★ 既存のコードをすべて削除してこれに置き換える
+const SS = SpreadsheetApp.getActiveSpreadsheet();
 
+// GET のみで全操作を受け付ける（CORSエラー回避）
 function doGet(e) {
-  const act = e.parameter.action;
-  if (act === 'read')   return res(readData());
-  if (act === 'test')   return res({ok:true});
-  return res({error:'unknown action'});
-}
+  try {
+    // payloadパラメータ経由でJSONを受け取る
+    const raw = e.parameter.payload;
+    const b   = raw ? JSON.parse(decodeURIComponent(escape(Utilities.base64Decode(raw, Utilities.Charset.UTF_8).join('')))) : {};
+    const act = b.action || e.parameter.action;
 
-function doPost(e) {
-  const body = JSON.parse(e.postData.contents);
-  const act  = body.action;
-  if (act === 'saveEntry')   return res(saveEntry(body));
-  if (act === 'deleteEntry') return res(deleteEntry(body));
-  if (act === 'saveHabit')   return res(saveHabit(body));
-  if (act === 'deleteHabit') return res(deleteHabit(body));
-  if (act === 'checkHabit')  return res(checkHabit(body));
-  return res({error:'unknown'});
+    if (act === 'test')        return res({ok: true});
+    if (act === 'read')        return res(readData());
+    if (act === 'saveEntry')   return res(saveEntry(b));
+    if (act === 'deleteEntry') return res(deleteEntry(b));
+    if (act === 'saveHabit')   return res(saveHabit(b));
+    if (act === 'deleteHabit') return res(deleteHabit(b));
+    if (act === 'checkHabit')  return res(checkHabit(b));
+    return res({error: 'unknown action: ' + act});
+  } catch(err) {
+    return res({error: err.message});
+  }
 }
 
 function res(obj) {
@@ -997,93 +1021,78 @@ function res(obj) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
-// ── Entries sheet ──
-function getEntriesSheet() {
-  return SS.getSheetByName('entries') || SS.insertSheet('entries');
-}
-function getHabitsSheet() {
-  return SS.getSheetByName('habits') || SS.insertSheet('habits');
-}
-function getHabitLogsSheet() {
-  return SS.getSheetByName('habit_logs') || SS.insertSheet('habit_logs');
+function getSheet(name) {
+  return SS.getSheetByName(name) || SS.insertSheet(name);
 }
 
 function readData() {
   const entries = [], habits = [], habitLogs = [];
-  const es = getEntriesSheet();
-  const er = es.getDataRange().getValues();
-  for (let i=1;i<er.length;i++) {
-    if(er[i][0]) entries.push({
-      id:er[i][0], date:er[i][1], sym:er[i][2],
-      text:er[i][3], state:er[i][4]
-    });
+  const er = getSheet('entries').getDataRange().getValues();
+  for (let i = 1; i < er.length; i++) {
+    if (er[i][0]) entries.push({id:er[i][0], date:er[i][1], sym:er[i][2], text:er[i][3], state:er[i][4]});
   }
-  const hs = getHabitsSheet();
-  const hr = hs.getDataRange().getValues();
-  for (let i=1;i<hr.length;i++) {
-    if(hr[i][0]) habits.push({id:hr[i][0], name:hr[i][1]});
+  const hr = getSheet('habits').getDataRange().getValues();
+  for (let i = 1; i < hr.length; i++) {
+    if (hr[i][0]) habits.push({id:hr[i][0], name:hr[i][1]});
   }
-  const ls = getHabitLogsSheet();
-  const lr = ls.getDataRange().getValues();
-  for (let i=1;i<lr.length;i++) {
-    if(lr[i][0]) habitLogs.push({
-      habitId:lr[i][0], date:lr[i][1], checked:lr[i][2]
-    });
+  const lr = getSheet('habit_logs').getDataRange().getValues();
+  for (let i = 1; i < lr.length; i++) {
+    if (lr[i][0]) habitLogs.push({habitId:lr[i][0], date:lr[i][1], checked:lr[i][2]});
   }
   return {entries, habits, habitLogs};
 }
 
 function saveEntry(b) {
-  const s = getEntriesSheet();
+  const s = getSheet('entries');
   if (s.getLastRow() === 0) s.appendRow(['id','date','sym','text','state']);
   const rows = s.getDataRange().getValues();
-  for (let i=1;i<rows.length;i++) {
+  for (let i = 1; i < rows.length; i++) {
     if (rows[i][0] === b.id) {
       s.getRange(i+1,1,1,5).setValues([[b.id,b.date,b.sym,b.text,b.state]]);
-      return {ok:true};
+      return {ok: true};
     }
   }
-  s.appendRow([b.id,b.date,b.sym,b.text,b.state]);
-  return {ok:true};
+  s.appendRow([b.id, b.date, b.sym, b.text, b.state]);
+  return {ok: true};
 }
 
 function deleteEntry(b) {
-  const s = getEntriesSheet();
+  const s = getSheet('entries');
   const rows = s.getDataRange().getValues();
-  for (let i=1;i<rows.length;i++) {
-    if (rows[i][0] === b.id) { s.deleteRow(i+1); return {ok:true}; }
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i][0] === b.id) { s.deleteRow(i+1); return {ok: true}; }
   }
-  return {ok:false};
+  return {ok: false};
 }
 
 function saveHabit(b) {
-  const s = getHabitsSheet();
+  const s = getSheet('habits');
   if (s.getLastRow() === 0) s.appendRow(['id','name']);
   s.appendRow([b.id, b.name]);
-  return {ok:true};
+  return {ok: true};
 }
 
 function deleteHabit(b) {
-  const s = getHabitsSheet();
+  const s = getSheet('habits');
   const rows = s.getDataRange().getValues();
-  for (let i=1;i<rows.length;i++) {
-    if (rows[i][0] === b.id) { s.deleteRow(i+1); return {ok:true}; }
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i][0] === b.id) { s.deleteRow(i+1); return {ok: true}; }
   }
-  return {ok:false};
+  return {ok: false};
 }
 
 function checkHabit(b) {
-  const s = getHabitLogsSheet();
+  const s = getSheet('habit_logs');
   if (s.getLastRow() === 0) s.appendRow(['habitId','date','checked']);
   const rows = s.getDataRange().getValues();
-  for (let i=1;i<rows.length;i++) {
-    if (rows[i][0]===b.habitId && rows[i][1]===b.date) {
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i][0] === b.habitId && rows[i][1] === b.date) {
       s.getRange(i+1,3).setValue(b.checked);
-      return {ok:true};
+      return {ok: true};
     }
   }
   s.appendRow([b.habitId, b.date, b.checked]);
-  return {ok:true};
+  return {ok: true};
 }`;
 
 // ─── State ───────────────────────────────────────────────────
@@ -1129,21 +1138,20 @@ function loadLocal() {
 }
 
 // ─── GAS API ─────────────────────────────────────────────────
-async function gasGet(params) {
+async function gasCall(params) {
   if (!state.gasUrl) throw new Error('GAS URL未設定');
-  const url = state.gasUrl + '?' + new URLSearchParams(params);
+  // GASはPOSTでCORSエラーになるためGET統一
+  // データはJSONをbase64エンコードしてクエリに乗せる
+  const payload = btoa(unescape(encodeURIComponent(JSON.stringify(params))));
+  const url = state.gasUrl + '?payload=' + encodeURIComponent(payload);
   const r = await fetch(url);
+  if (!r.ok) throw new Error('HTTP ' + r.status);
   return r.json();
 }
-async function gasPost(body) {
-  if (!state.gasUrl) throw new Error('GAS URL未設定');
-  const r = await fetch(state.gasUrl, {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify(body),
-  });
-  return r.json();
-}
+
+// 後方互換
+async function gasGet(params) { return gasCall(params); }
+async function gasPost(body)  { return gasCall(body); }
 
 // ─── Sync ────────────────────────────────────────────────────
 async function syncAll() {
@@ -1593,6 +1601,31 @@ function renderCollections() {
 }
 
 // ─── Settings ────────────────────────────────────────────────
+function copyGasCode() {
+  const code = document.getElementById('gasCodeBlock').textContent;
+  navigator.clipboard.writeText(code).then(() => {
+    const btn = document.getElementById('copyGasBtn');
+    btn.textContent = '✓ コピー済み';
+    btn.style.background = 'rgba(138,158,122,0.4)';
+    setTimeout(() => {
+      btn.textContent = 'コピー';
+      btn.style.background = 'rgba(255,255,255,0.12)';
+    }, 2000);
+  }).catch(() => {
+    // フォールバック
+    const ta = document.createElement('textarea');
+    ta.value = code;
+    ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    const btn = document.getElementById('copyGasBtn');
+    btn.textContent = '✓ コピー済み';
+    setTimeout(() => { btn.textContent = 'コピー'; }, 2000);
+  });
+}
+
 function saveConfig() {
   const url = document.getElementById('cfgUrl').value.trim();
   state.gasUrl = url;
