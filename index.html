@@ -1034,6 +1034,19 @@ function getSheet(name) {
   return SS.getSheetByName(name) || SS.insertSheet(name);
 }
 
+function formatDate(v) {
+  if (!v) return '';
+  // すでに文字列でYYYY-MM-DD形式ならそのまま
+  if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v)) return v.slice(0, 10);
+  // Dateオブジェクトや他の形式はフォーマット
+  const d = new Date(v);
+  if (isNaN(d)) return String(v);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return y + '-' + m + '-' + day;
+}
+
 function readData() {
   const entries = [], habits = [], habitLogs = [];
   const es = getSheet('entries');
@@ -1042,7 +1055,7 @@ function readData() {
     for (let i = 1; i < er.length; i++) {
       if (er[i][0]) entries.push({
         id: String(er[i][0]),
-        date: String(er[i][1]),
+        date: formatDate(er[i][1]),
         sym: String(er[i][2]),
         text: String(er[i][3]),
         state: String(er[i][4])
@@ -1062,7 +1075,7 @@ function readData() {
     for (let i = 1; i < lr.length; i++) {
       if (lr[i][0]) habitLogs.push({
         habitId: String(lr[i][0]),
-        date: String(lr[i][1]),
+        date: formatDate(lr[i][1]),
         checked: lr[i][2] === true || lr[i][2] === 'true'
       });
     }
@@ -1188,6 +1201,7 @@ async function syncAll() {
   btn.classList.add('spinning');
   try {
     const data = await gasGet({action:'read'});
+    console.log('GAS response:', JSON.stringify(data, null, 2));
 
     // GASがerrorを返した場合はローカルデータを保持
     if (data.error) {
