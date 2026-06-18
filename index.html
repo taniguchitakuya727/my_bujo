@@ -245,6 +245,7 @@
   /* ── add entry ── */
   .add-entry {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 8px;
     padding: 8px;
@@ -252,6 +253,13 @@
     border-radius: var(--radius);
     background: transparent;
     margin-bottom: 24px;
+  }
+  .add-entry-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
   }
 
   .bullet-picker {
@@ -274,6 +282,7 @@
 
   .add-input {
     flex: 1;
+    min-width: 0;
     background: none;
     border: none;
     outline: none;
@@ -963,7 +972,7 @@
 <header>
   <div class="header-top">
     <div class="logo">BuJo<span>.</span></div>
-    <div class="build-time">built 2026.06.19 03:16</div>
+    <div class="build-time">built 2026.06.19 03:21</div>
     <div class="date-display" id="headerDate"></div>
   </div>
   <nav>
@@ -996,12 +1005,14 @@
     <div class="entry-list" id="entryList"></div>
 
     <div class="add-entry">
-      <div class="bullet-picker" id="bulletPicker">
-        <div class="bullet-opt selected" data-sym="・" title="タスク" onclick="selectBullet(this)">・</div>
-        <div class="bullet-opt" data-sym="○" title="イベント" onclick="selectBullet(this)">○</div>
-        <div class="bullet-opt" data-sym="ー" title="メモ" onclick="selectBullet(this)">ー</div>
+      <div class="add-entry-row">
+        <div class="bullet-picker" id="bulletPicker">
+          <div class="bullet-opt selected" data-sym="・" title="タスク" onclick="selectBullet(this)">・</div>
+          <div class="bullet-opt" data-sym="○" title="イベント" onclick="selectBullet(this)">○</div>
+          <div class="bullet-opt" data-sym="ー" title="メモ" onclick="selectBullet(this)">ー</div>
+        </div>
+        <input class="add-input" id="addInput" placeholder="エントリを追加..." onkeydown="onAddKey(event)">
       </div>
-      <input class="add-input" id="addInput" placeholder="エントリを追加..." onkeydown="onAddKey(event)">
       <button class="add-btn" onclick="addEntry()">追加</button>
     </div>
 
