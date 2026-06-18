@@ -107,8 +107,8 @@
     padding: 24px 16px env(safe-area-inset-bottom, 24px);
   }
 
-  .tab { display: none; }
-  .tab.active { display: block; }
+  .tab { display: none !important; }
+  .tab.active { display: block !important; }
 
   /* ── section header ── */
   .section-heading {
@@ -963,7 +963,7 @@
 <header>
   <div class="header-top">
     <div class="logo">BuJo<span>.</span></div>
-    <div class="build-time">built 2026.06.16 23:29</div>
+    <div class="build-time">built 2026.06.19 03:16</div>
     <div class="date-display" id="headerDate"></div>
   </div>
   <nav>
@@ -1181,6 +1181,9 @@
     </div>
   </div>
 </div>
+
+<!-- habit modal -->
+<div class="modal-overlay" id="habitModal">
   <div class="modal">
     <h3>習慣を追加</h3>
     <input type="text" id="habitNameInput" placeholder="例: 読書, 運動, 瞑想..." maxlength="20">
