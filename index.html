@@ -222,6 +222,26 @@
   .entry:hover .entry-delete { opacity: 1; }
   .entry-delete:hover { color: var(--accent2); }
 
+  /* ── bullet picker dropdown ── */
+  .bullet-picker-dropdown {
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    box-shadow: 0 4px 16px rgba(0,0,0,.12);
+    z-index: 300;
+    min-width: 160px;
+    overflow: hidden;
+  }
+  .bullet-picker-item {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    padding: 10px 14px;
+    cursor: pointer;
+    color: var(--ink);
+    transition: background .1s;
+  }
+  .bullet-picker-item:hover { background: var(--paper-dark); }
+
   /* ── add entry ── */
   .add-entry {
     display: flex;
@@ -749,6 +769,108 @@
   }
   .col-type-tab.selected { background: var(--ink); color: var(--paper); border-color: var(--ink); }
 
+  /* ── help button ── */
+  .help-btn {
+    background: var(--paper-dark);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    padding: 6px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--ink);
+    white-space: nowrap;
+  }
+  .help-btn:hover { background: var(--rule); }
+
+  /* ── help modal ── */
+  .help-modal {
+    width: min(520px, 94vw);
+    max-height: 85dvh;
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    overflow: hidden;
+  }
+  .help-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 20px 14px;
+    border-bottom: 1px solid var(--rule);
+    flex-shrink: 0;
+  }
+  .help-header h3 {
+    font-family: 'Noto Serif JP', serif;
+    font-size: 16px;
+    margin: 0;
+  }
+  .help-close {
+    background: none;
+    border: none;
+    font-size: 16px;
+    cursor: pointer;
+    color: var(--ink-light);
+    padding: 4px 6px;
+    border-radius: var(--radius);
+  }
+  .help-close:hover { background: var(--paper-dark); color: var(--ink); }
+
+  .help-body {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 16px 20px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .help-section {
+    border-left: 3px solid var(--accent);
+    padding-left: 12px;
+  }
+  .help-section-title {
+    font-family: 'Noto Serif JP', serif;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--accent);
+    margin-bottom: 8px;
+  }
+  .help-section-body {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--ink);
+  }
+  .help-table {
+    background: var(--paper-dark);
+    border-radius: var(--radius);
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .help-row {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    font-size: 13px;
+  }
+  .help-sym {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    min-width: 20px;
+    text-align: center;
+    color: var(--ink);
+  }
+  .help-tip {
+    font-size: 12px;
+    color: var(--ink-light);
+    padding-left: 2px;
+  }
+  .help-tip b { color: var(--ink); }
+
   /* ── modal ── */
   .modal-overlay {
     display: none;
@@ -841,7 +963,7 @@
 <header>
   <div class="header-top">
     <div class="logo">BuJo<span>.</span></div>
-    <div class="build-time">built 2026.06.15 11:08</div>
+    <div class="build-time">built 2026.06.16 23:29</div>
     <div class="date-display" id="headerDate"></div>
   </div>
   <nav>
@@ -925,7 +1047,10 @@
 
   <!-- ===== SETTINGS TAB ===== -->
   <div class="tab" id="tab-settings">
-    <div class="section-heading">Settings</div>
+    <div style="display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:4px;">
+      <div class="section-heading">Settings</div>
+      <button class="help-btn" onclick="openHelpModal()">？ 使い方</button>
+    </div>
     <div class="section-sub">GAS連携の設定</div>
 
     <div class="config-section">
@@ -987,7 +1112,75 @@
     </div>
   </div>
 </div>
-<div class="modal-overlay" id="habitModal">
+<div class="modal-overlay" id="helpModal">
+  <div class="modal help-modal">
+    <div class="help-header">
+      <h3>📖 BuJo. 使い方ガイド</h3>
+      <button class="help-close" onclick="closeHelpModal()">✕</button>
+    </div>
+    <div class="help-body">
+
+      <div class="help-section">
+        <div class="help-section-title">Daily — 毎日の記録</div>
+        <div class="help-section-body">
+          <p>日々のタスク・イベント・メモを記録するページです。</p>
+          <div class="help-table">
+            <div class="help-row"><span class="help-sym">・</span><span>タスク（やること）</span></div>
+            <div class="help-row"><span class="help-sym">○</span><span>イベント（予定・出来事）</span></div>
+            <div class="help-row"><span class="help-sym">ー</span><span>メモ（気づき・情報）</span></div>
+            <div class="help-row"><span class="help-sym">×</span><span>完了（タスク・イベントを達成）</span></div>
+            <div class="help-row"><span class="help-sym">></span><span>移行（別の日や場所に持ち越し）</span></div>
+          </div>
+          <div class="help-tip">💡 記号をタップすると <b>・→×→></b> の順に状態が変わります</div>
+          <div class="help-tip">💡 ‹ › ボタンで前後の日に移動、Today で今日に戻れます</div>
+        </div>
+      </div>
+
+      <div class="help-section">
+        <div class="help-section-title">Monthly — 月カレンダー</div>
+        <div class="help-section-body">
+          <p>月全体のエントリをカレンダーで確認できます。</p>
+          <div class="help-tip">💡 日付をタップするとその日のDailyに移動します</div>
+          <div class="help-tip">💡 各日に最大3件のエントリがプレビュー表示されます</div>
+        </div>
+      </div>
+
+      <div class="help-section">
+        <div class="help-section-title">Habits — 習慣トラッカー</div>
+        <div class="help-section-body">
+          <p>毎日続けたい習慣の達成状況を月単位で記録します。</p>
+          <div class="help-tip">💡「+ 習慣を追加」から習慣名を登録</div>
+          <div class="help-tip">💡 表のマスをタップするとチェック（✓）が入ります</div>
+          <div class="help-tip">💡 上部のバーで月全体の達成率が一目でわかります</div>
+        </div>
+      </div>
+
+      <div class="help-section">
+        <div class="help-section-title">Collections — コレクション</div>
+        <div class="help-section-body">
+          <p>テーマ別の自由なメモページです。</p>
+          <div class="help-table">
+            <div class="help-row"><span class="help-sym">📋</span><span>チェックリスト型：読書リスト、買い物メモなど</span></div>
+            <div class="help-row"><span class="help-sym">📝</span><span>フリーノート型：アイデア帳、自由記述</span></div>
+          </div>
+          <div class="help-tip">💡「+ 新規」からタイトルと種類を選んで作成</div>
+          <div class="help-tip">💡 カードのタイトル部分をタップして開閉できます</div>
+        </div>
+      </div>
+
+      <div class="help-section">
+        <div class="help-section-title">同期について</div>
+        <div class="help-section-body">
+          <p>データはGoogleスプレッドシートに保存され、複数デバイスで共有できます。</p>
+          <div class="help-tip">💡 右下の <b>⟳</b> ボタンで手動同期</div>
+          <div class="help-tip">💡 アプリ起動時に自動で最新データを読み込みます</div>
+          <div class="help-tip">💡 GAS未設定の場合はブラウザ内（localStorage）に保存されます</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
   <div class="modal">
     <h3>習慣を追加</h3>
     <input type="text" id="habitNameInput" placeholder="例: 読書, 運動, 瞑想..." maxlength="20">
@@ -1302,7 +1495,7 @@ function renderDaily() {
     div.className = 'entry' + (e.state==='done'?' done':e.state==='migrated'?' migrated':'');
     div.dataset.id = e.id;
     div.innerHTML = `
-      <span class="entry-bullet" title="クリックで状態変更" onclick="cycleBullet('${e.id}')">${e.sym}</span>
+      <span class="entry-bullet" title="タップで記号を変更" onclick="showBulletPicker('${e.id}',this)">${e.sym}</span>
       <textarea class="entry-text" rows="1" onchange="updateEntryText('${e.id}',this.value)"
         onInput="autoResize(this)">${escHtml(e.text)}</textarea>
       <button class="entry-delete" onclick="deleteEntry('${e.id}')">✕</button>`;
@@ -1352,16 +1545,79 @@ async function addEntry() {
   }
 }
 
-async function cycleBullet(id) {
+// プルダウン用オーバーレイ管理
+let _pickerCleanup = null;
+
+function showBulletPicker(id, bulletEl) {
+  // 既存のピッカーを閉じる
+  if (_pickerCleanup) { _pickerCleanup(); _pickerCleanup = null; }
+
+  const SYMS = [
+    { sym: '・', label: '・ タスク' },
+    { sym: '○', label: '○ イベント' },
+    { sym: 'ー', label: 'ー メモ' },
+    { sym: '×', label: '× 完了' },
+    { sym: '>',  label: '> 移行（翌日へ）' },
+  ];
+
+  const picker = document.createElement('div');
+  picker.className = 'bullet-picker-dropdown';
+  SYMS.forEach(({ sym, label }) => {
+    const item = document.createElement('div');
+    item.className = 'bullet-picker-item';
+    item.textContent = label;
+    item.onclick = (ev) => {
+      ev.stopPropagation();
+      selectBulletForEntry(id, sym);
+      cleanup();
+    };
+    picker.appendChild(item);
+  });
+
+  // 位置をbulletElの直下に
+  const rect = bulletEl.getBoundingClientRect();
+  picker.style.position = 'fixed';
+  picker.style.top  = (rect.bottom + 4) + 'px';
+  picker.style.left = (rect.left) + 'px';
+  document.body.appendChild(picker);
+
+  function cleanup() {
+    picker.remove();
+    document.removeEventListener('click', onOutside);
+    _pickerCleanup = null;
+  }
+  function onOutside(ev) {
+    if (!picker.contains(ev.target)) cleanup();
+  }
+  setTimeout(() => document.addEventListener('click', onOutside), 0);
+  _pickerCleanup = cleanup;
+}
+
+async function selectBulletForEntry(id, sym) {
   const e = state.entries.find(x => x.id === id);
   if (!e) return;
-  const next = BULLET_CYCLE[e.sym] || '・';
-  e.sym = next;
-  e.state = next === '×' ? 'done' : next === '>' ? 'migrated' : 'open';
+  const prevSym = e.sym;
+  e.sym   = sym;
+  e.state = sym === '×' ? 'done' : sym === '>' ? 'migrated' : 'open';
   saveLocal();
   renderDaily();
   if (state.gasUrl) {
     try { await gasPost({action:'saveEntry', ...e}); } catch(_) {}
+  }
+
+  // > を選んだら翌日に自動コピー
+  if (sym === '>' && prevSym !== '>') {
+    const dt = new Date(e.date + 'T00:00:00');
+    dt.setDate(dt.getDate() + 1);
+    const nextDate = `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}`;
+    const copied = { id: uid(), date: nextDate, sym: '・', text: e.text, state: 'open' };
+    state.entries.push(copied);
+    saveLocal();
+    setStatus('dailyStatus', `✓ 翌日（${nextDate}）にコピーしました`, 'ok');
+    setTimeout(() => setStatus('dailyStatus', '', ''), 3000);
+    if (state.gasUrl) {
+      try { await gasPost({action:'saveEntry', ...copied}); } catch(_) {}
+    }
   }
 }
 
@@ -1539,6 +1795,14 @@ function renderHabits() {
   });
   html += '</tbody></table>';
   wrap.innerHTML = html;
+}
+
+// ─── Help Modal ──────────────────────────────────────────────
+function openHelpModal() {
+  document.getElementById('helpModal').classList.add('open');
+}
+function closeHelpModal() {
+  document.getElementById('helpModal').classList.remove('open');
 }
 
 // ─── Collections ─────────────────────────────────────────────
@@ -1758,6 +2022,11 @@ function init() {
   });
   document.getElementById('colModal').addEventListener('click', e => {
     if (e.target === e.currentTarget) closeColModal();
+  });
+
+  // help modal
+  document.getElementById('helpModal').addEventListener('click', e => {
+    if (e.target === e.currentTarget) closeHelpModal();
   });
 }
 
