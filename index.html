@@ -222,6 +222,22 @@
   .entry:hover .entry-delete { opacity: 1; }
   .entry-delete:hover { color: var(--accent2); }
 
+  .drag-handle {
+    font-size: 14px;
+    color: var(--rule);
+    cursor: grab;
+    padding: 0 2px;
+    line-height: 1.4;
+    user-select: none;
+    flex-shrink: 0;
+    touch-action: none;
+  }
+  .drag-handle:active { cursor: grabbing; }
+  .entry.dragging {
+    opacity: .4;
+    background: var(--paper-dark);
+  }
+
   /* ── bullet picker dropdown ── */
   .bullet-picker-dropdown {
     background: var(--paper);
@@ -1115,7 +1131,7 @@
 <header>
   <div class="header-top">
     <div class="logo">BuJo<span>.</span></div>
-    <div class="build-time">built 2026.06.22 17:35</div>
+    <div class="build-time">built 2026.06.22 19:17</div>
     <div class="date-display" id="headerDate"></div>
   </div>
   <nav>
@@ -1390,6 +1406,7 @@ function doGet(e) {
     if (act === 'saveHabit')   return res(saveHabit(b));
     if (act === 'deleteHabit') return res(deleteHabit(b));
     if (act === 'checkHabit')  return res(checkHabit(b));
+    if (act === 'saveOrder')   return res(saveOrder(b));
     return res({error: 'unknown action: ' + act});
   } catch(err) {
     return res({error: err.message});
@@ -1430,7 +1447,8 @@ function readData() {
         date: formatDate(er[i][1]),
         sym: String(er[i][2]),
         text: String(er[i][3]),
-        state: String(er[i][4])
+        state: String(er[i][4]),
+        order: Number(er[i][5]) || i
       });
     }
   }
@@ -1457,15 +1475,30 @@ function readData() {
 
 function saveEntry(b) {
   const s = getSheet('entries');
-  if (s.getLastRow() === 0) s.appendRow(['id','date','sym','text','state']);
+  if (s.getLastRow() === 0) s.appendRow(['id','date','sym','text','state','order']);
   const rows = s.getDataRange().getValues();
   for (let i = 1; i < rows.length; i++) {
     if (rows[i][0] === b.id) {
-      s.getRange(i+1,1,1,5).setValues([[b.id,b.date,b.sym,b.text,b.state]]);
+      s.getRange(i+1,1,1,6).setValues([[b.id,b.date,b.sym,b.text,b.state,b.order||0]]);
       return {ok: true};
     }
   }
-  s.appendRow([b.id, b.date, b.sym, b.text, b.state]);
+  s.appendRow([b.id, b.date, b.sym, b.text, b.state, b.order||0]);
+  return {ok: true};
+}
+
+function saveOrder(b) {
+  const s = getSheet('entries');
+  if (s.getLastRow() < 2) return {ok: true};
+  const rows = s.getDataRange().getValues();
+  const orderMap = {};
+  (b.orders || []).forEach(o => { orderMap[o.id] = o.order; });
+  for (let i = 1; i < rows.length; i++) {
+    const id = String(rows[i][0]);
+    if (orderMap[id] !== undefined) {
+      s.getRange(i+1, 6).setValue(orderMap[id]);
+    }
+  }
   return {ok: true};
 }
 
@@ -1513,7 +1546,7 @@ const state = {
   gasUrl: '',
   currentDate: todayStr(),
   viewMonth: monthStr(new Date()),
-  entries: [],     // {id, date, sym, text, state}
+  entries: [],     // {id, date, sym, text, state, order}
   habits: [],      // {id, name}
   habitLogs: [],   // {habitId, date, checked}
   collections: [], // {id, title, type, notes, items:[{id,text,checked}]}
@@ -1666,14 +1699,20 @@ function renderDaily() {
   document.getElementById('dailyDateLabel').textContent =
     `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日（${dow}）`;
 
-  const entries = state.entries.filter(e => e.date === state.currentDate);
+  // orderで並び替え（orderがない場合はインデックス順）
+  const entries = state.entries
+    .filter(e => e.date === state.currentDate)
+    .sort((a, b) => (a.order ?? 9999) - (b.order ?? 9999));
+
   const list = document.getElementById('entryList');
   list.innerHTML = '';
   entries.forEach(e => {
     const div = document.createElement('div');
     div.className = 'entry' + (e.state==='done'?' done':e.state==='migrated'?' migrated':'');
     div.dataset.id = e.id;
+    div.draggable = true;
     div.innerHTML = `
+      <span class="drag-handle" title="ドラッグで並び替え">⋮⋮</span>
       <span class="entry-bullet" title="タップで記号を変更" onclick="showBulletPicker('${e.id}',this)">${e.sym}</span>
       <textarea class="entry-text" rows="1" onchange="updateEntryText('${e.id}',this.value)"
         onInput="autoResize(this)">${escHtml(e.text)}</textarea>
@@ -1681,6 +1720,8 @@ function renderDaily() {
     list.appendChild(div);
     autoResize(div.querySelector('.entry-text'));
   });
+
+  initDragSort(list);
 }
 
 function autoResize(ta) {
@@ -1707,12 +1748,16 @@ async function addEntry() {
   const inp = document.getElementById('addInput');
   const text = inp.value.trim();
   if (!text) return;
+  // 同日の最大orderを取得して+1
+  const dayEntries = state.entries.filter(e => e.date === state.currentDate);
+  const maxOrder = dayEntries.reduce((m, e) => Math.max(m, e.order ?? 0), 0);
   const entry = {
     id: uid(),
     date: state.currentDate,
     sym: selectedBullet(),
     text,
     state: 'open',
+    order: maxOrder + 1,
   };
   state.entries.push(entry);
   saveLocal();
@@ -1816,6 +1861,101 @@ async function deleteEntry(id) {
   renderDaily();
   if (state.gasUrl) {
     try { await gasPost({action:'deleteEntry', id}); } catch(_) {}
+  }
+}
+
+// ─── Drag & Drop Sort ────────────────────────────────────────
+function initDragSort(list) {
+  let dragging = null;
+  let touchClone = null;
+  let touchOffsetY = 0;
+
+  // ── Mouse drag ──
+  list.querySelectorAll('.entry').forEach(item => {
+    item.addEventListener('dragstart', e => {
+      dragging = item;
+      setTimeout(() => item.classList.add('dragging'), 0);
+    });
+    item.addEventListener('dragend', () => {
+      item.classList.remove('dragging');
+      dragging = null;
+      commitOrder();
+    });
+  });
+  list.addEventListener('dragover', e => {
+    e.preventDefault();
+    if (!dragging) return;
+    const over = getDragTarget(e.clientY, list);
+    if (over && over !== dragging) {
+      const rect = over.getBoundingClientRect();
+      const mid = rect.top + rect.height / 2;
+      if (e.clientY < mid) list.insertBefore(dragging, over);
+      else list.insertBefore(dragging, over.nextSibling);
+    }
+  });
+
+  // ── Touch drag ──
+  list.querySelectorAll('.drag-handle').forEach(handle => {
+    handle.addEventListener('touchstart', e => {
+      const item = handle.closest('.entry');
+      dragging = item;
+      const touch = e.touches[0];
+      const rect = item.getBoundingClientRect();
+      touchOffsetY = touch.clientY - rect.top;
+
+      // 半透明のクローンを作って動かす
+      touchClone = item.cloneNode(true);
+      touchClone.style.cssText = `
+        position:fixed; left:${rect.left}px; top:${rect.top}px;
+        width:${rect.width}px; opacity:.7; z-index:999; pointer-events:none;
+        background:var(--paper); border:1px solid var(--accent); border-radius:4px;`;
+      document.body.appendChild(touchClone);
+      item.classList.add('dragging');
+      e.preventDefault();
+    }, {passive: false});
+
+    handle.addEventListener('touchmove', e => {
+      if (!dragging || !touchClone) return;
+      const touch = e.touches[0];
+      touchClone.style.top = (touch.clientY - touchOffsetY) + 'px';
+      const over = getDragTarget(touch.clientY, list);
+      if (over && over !== dragging) {
+        const rect = over.getBoundingClientRect();
+        const mid = rect.top + rect.height / 2;
+        if (touch.clientY < mid) list.insertBefore(dragging, over);
+        else list.insertBefore(dragging, over.nextSibling);
+      }
+      e.preventDefault();
+    }, {passive: false});
+
+    handle.addEventListener('touchend', () => {
+      if (touchClone) { touchClone.remove(); touchClone = null; }
+      if (dragging) { dragging.classList.remove('dragging'); dragging = null; }
+      commitOrder();
+    });
+  });
+}
+
+function getDragTarget(clientY, list) {
+  return [...list.querySelectorAll('.entry:not(.dragging)')].find(el => {
+    const r = el.getBoundingClientRect();
+    return clientY >= r.top && clientY <= r.bottom;
+  });
+}
+
+async function commitOrder() {
+  // DOM順序からorderを再採番してstateに反映
+  const list = document.getElementById('entryList');
+  const ids = [...list.querySelectorAll('.entry')].map(el => el.dataset.id);
+  ids.forEach((id, i) => {
+    const e = state.entries.find(x => x.id === id);
+    if (e) e.order = i + 1;
+  });
+  saveLocal();
+  if (state.gasUrl) {
+    try {
+      await gasPost({ action: 'saveOrder', orders: ids.map((id, i) => ({ id, order: i + 1 })) });
+    } catch(_) {}
   }
 }
 
