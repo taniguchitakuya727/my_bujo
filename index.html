@@ -972,7 +972,7 @@
 <header>
   <div class="header-top">
     <div class="logo">BuJo<span>.</span></div>
-    <div class="build-time">built 2026.06.19 03:21</div>
+    <div class="build-time">built 2026.06.22 16:30</div>
     <div class="date-display" id="headerDate"></div>
   </div>
   <nav>
@@ -1809,6 +1809,17 @@ function renderHabits() {
   });
   html += '</tbody></table>';
   wrap.innerHTML = html;
+
+  // 今日の列を中央にスクロール
+  const todayCell = wrap.querySelector('.today-col');
+  if (todayCell) {
+    setTimeout(() => {
+      const cellLeft = todayCell.offsetLeft;
+      const cellWidth = todayCell.offsetWidth;
+      const wrapWidth = wrap.offsetWidth;
+      wrap.scrollLeft = cellLeft - wrapWidth / 2 + cellWidth / 2;
+    }, 0);
+  }
 }
 
 // ─── Help Modal ──────────────────────────────────────────────
@@ -1882,9 +1893,24 @@ function toggleColItem(colId, itemId) {
   const col = state.collections.find(c => c.id === colId);
   if (!col) return;
   const item = col.items.find(i => i.id === itemId);
-  if (item) item.checked = !item.checked;
+  if (!item) return;
+  item.checked = !item.checked;
   saveLocal();
-  renderCollections();
+
+  const card = document.querySelector(`.col-card[data-id="${colId}"]`);
+  if (card) {
+    const checkEl = card.querySelector(`.col-item-check[data-item-id="${itemId}"]`);
+    const textEl  = card.querySelector(`.col-item-text[data-item-id="${itemId}"]`);
+    if (checkEl) {
+      checkEl.classList.toggle('checked', item.checked);
+      // spanでチェックマークを管理（onclickを消さないため）
+      const mark = checkEl.querySelector('.check-mark');
+      if (mark) mark.textContent = item.checked ? '✓' : '';
+    }
+    if (textEl) textEl.classList.toggle('checked-text', item.checked);
+    const countEl = card.querySelector('.col-card-count');
+    if (countEl) countEl.textContent = `${col.items.filter(i=>i.checked).length}/${col.items.length}`;
+  }
 }
 
 function deleteColItem(colId, itemId) {
@@ -1892,7 +1918,14 @@ function deleteColItem(colId, itemId) {
   if (!col) return;
   col.items = col.items.filter(i => i.id !== itemId);
   saveLocal();
-  renderCollections();
+  // 削除は行ごと消すだけ（カードは開いたまま）
+  const card = document.querySelector(`.col-card[data-id="${colId}"]`);
+  if (card) {
+    const row = card.querySelector(`.col-item[data-item-id="${itemId}"]`);
+    if (row) row.remove();
+    const countEl = card.querySelector('.col-card-count');
+    if (countEl) countEl.textContent = `${col.items.filter(i=>i.checked).length}/${col.items.length}`;
+  }
 }
 
 function updateColNotes(colId, val) {
@@ -1918,11 +1951,11 @@ function renderCollections() {
     let body = '';
     if (col.type === 'checklist') {
       const items = col.items.map(item => `
-        <div class="col-item">
-          <div class="col-item-check${item.checked?' checked':''}" onclick="toggleColItem('${col.id}','${item.id}')">
-            ${item.checked ? '✓' : ''}
+        <div class="col-item" data-item-id="${item.id}">
+          <div class="col-item-check${item.checked?' checked':''}" data-item-id="${item.id}" onclick="toggleColItem('${col.id}','${item.id}')">
+            <span class="check-mark">${item.checked ? '✓' : ''}</span>
           </div>
-          <input class="col-item-text${item.checked?' checked-text':''}" value="${escHtml(item.text)}"
+          <input class="col-item-text${item.checked?' checked-text':''}" data-item-id="${item.id}" value="${escHtml(item.text)}"
             onchange="(()=>{const c=state.collections.find(x=>x.id==='${col.id}');const i=c&&c.items.find(x=>x.id==='${item.id}');if(i){i.text=this.value;saveLocal();}})()">
           <button class="col-item-del" onclick="deleteColItem('${col.id}','${item.id}')">✕</button>
         </div>`).join('');
