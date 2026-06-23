@@ -732,8 +732,18 @@
     opacity: 0;
   }
   .col-item:hover .col-item-del { opacity: 1; }
-  .col-item-del:hover { color: var(--accent2); }
-
+  .col-item-drag-handle {
+    font-size: 14px;
+    color: var(--rule);
+    cursor: grab;
+    padding: 0 2px;
+    user-select: none;
+    flex-shrink: 0;
+    touch-action: none;
+    line-height: 1;
+  }
+  .col-item-drag-handle:active { cursor: grabbing; }
+  .col-item.dragging { opacity: .4; background: var(--paper-dark); border-radius: var(--radius); }
   .col-add-item {
     display: flex;
     align-items: center;
@@ -1139,7 +1149,7 @@
 <header>
   <div class="header-top">
     <div class="logo">BuJo<span>.</span></div>
-    <div class="build-time">built 2026.06.22 21:30</div>
+    <div class="build-time">built 2026.06.23 16:37</div>
     <div class="date-display" id="headerDate"></div>
   </div>
   <nav>
@@ -1407,14 +1417,16 @@ function doGet(e) {
     const b   = raw ? JSON.parse(Utilities.newBlob(Utilities.base64Decode(raw)).getDataAsString()) : {};
     const act = b.action || e.parameter.action;
 
-    if (act === 'test')        return res({ok: true});
-    if (act === 'read')        return res(readData());
-    if (act === 'saveEntry')   return res(saveEntry(b));
-    if (act === 'deleteEntry') return res(deleteEntry(b));
-    if (act === 'saveHabit')   return res(saveHabit(b));
-    if (act === 'deleteHabit') return res(deleteHabit(b));
-    if (act === 'checkHabit')  return res(checkHabit(b));
-    if (act === 'saveOrder')   return res(saveOrder(b));
+    if (act === 'test')              return res({ok: true});
+    if (act === 'read')              return res(readData());
+    if (act === 'saveEntry')         return res(saveEntry(b));
+    if (act === 'deleteEntry')       return res(deleteEntry(b));
+    if (act === 'saveHabit')         return res(saveHabit(b));
+    if (act === 'deleteHabit')       return res(deleteHabit(b));
+    if (act === 'checkHabit')        return res(checkHabit(b));
+    if (act === 'saveOrder')         return res(saveOrder(b));
+    if (act === 'saveCollection')    return res(saveCollection(b));
+    if (act === 'deleteCollection')  return res(deleteCollection(b));
     return res({error: 'unknown action: ' + act});
   } catch(err) {
     return res({error: err.message});
@@ -1445,7 +1457,7 @@ function formatDate(v) {
 }
 
 function readData() {
-  const entries = [], habits = [], habitLogs = [];
+  const entries = [], habits = [], habitLogs = [], collections = [];
   const es = getSheet('entries');
   if (es.getLastRow() > 1) {
     const er = es.getDataRange().getValues();
@@ -1478,7 +1490,42 @@ function readData() {
       });
     }
   }
-  return {entries, habits, habitLogs};
+  const cs = getSheet('collections');
+  if (cs.getLastRow() > 1) {
+    const cr = cs.getDataRange().getValues();
+    for (let i = 1; i < cr.length; i++) {
+      if (cr[i][0]) {
+        try {
+          collections.push(JSON.parse(String(cr[i][1])));
+        } catch(e) {}
+      }
+    }
+  }
+  return {entries, habits, habitLogs, collections};
+}
+
+function saveCollection(b) {
+  const s = getSheet('collections');
+  if (s.getLastRow() === 0) s.appendRow(['id','data']);
+  const rows = s.getDataRange().getValues();
+  const json = JSON.stringify(b.collection);
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i][0] === b.collection.id) {
+      s.getRange(i+1,1,1,2).setValues([[b.collection.id, json]]);
+      return {ok: true};
+    }
+  }
+  s.appendRow([b.collection.id, json]);
+  return {ok: true};
+}
+
+function deleteCollection(b) {
+  const s = getSheet('collections');
+  const rows = s.getDataRange().getValues();
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i][0] === b.id) { s.deleteRow(i+1); return {ok: true}; }
+  }
+  return {ok: false};
 }
 
 function saveEntry(b) {
@@ -1644,10 +1691,10 @@ async function syncAll() {
     }
 
     // GASから有効なデータが返ってきた場合のみ上書き
-    // entries/habits/habitLogsそれぞれ、配列として返ってきたときだけ反映
-    if (Array.isArray(data.entries))   state.entries   = data.entries;
-    if (Array.isArray(data.habits))    state.habits    = data.habits;
-    if (Array.isArray(data.habitLogs)) state.habitLogs = data.habitLogs;
+    if (Array.isArray(data.entries))     state.entries     = data.entries;
+    if (Array.isArray(data.habits))      state.habits      = data.habits;
+    if (Array.isArray(data.habitLogs))   state.habitLogs   = data.habitLogs;
+    if (Array.isArray(data.collections)) state.collections = data.collections;
 
     saveLocal();
     renderAll();
@@ -2283,6 +2330,9 @@ async function confirmAddCol() {
   saveLocal();
   closeColModal();
   renderCollections();
+  if (state.gasUrl) {
+    try { await gasPost({action:'saveCollection', collection: col}); } catch(_) {}
+  }
 }
 
 async function deleteCollection(id) {
@@ -2290,6 +2340,9 @@ async function deleteCollection(id) {
   state.collections = state.collections.filter(c => c.id !== id);
   saveLocal();
   renderCollections();
+  if (state.gasUrl) {
+    try { await gasPost({action:'deleteCollection', id}); } catch(_) {}
+  }
 }
 
 function toggleColCard(id) {
@@ -2297,7 +2350,7 @@ function toggleColCard(id) {
   if (card) card.classList.toggle('open');
 }
 
-function addColItem(colId) {
+async function addColItem(colId) {
   const inp = document.getElementById('col-inp-' + colId);
   const text = inp?.value.trim();
   if (!text) return;
@@ -2306,11 +2359,13 @@ function addColItem(colId) {
   col.items.push({ id: uid(), text, checked: false });
   saveLocal();
   renderCollections();
-  // reopen card
   setTimeout(() => {
     const card = document.querySelector(`.col-card[data-id="${colId}"]`);
     if (card && !card.classList.contains('open')) card.classList.add('open');
   }, 10);
+  if (state.gasUrl) {
+    try { await gasPost({action:'saveCollection', collection: col}); } catch(_) {}
+  }
 }
 
 function toggleColItem(colId, itemId) {
@@ -2327,13 +2382,15 @@ function toggleColItem(colId, itemId) {
     const textEl  = card.querySelector(`.col-item-text[data-item-id="${itemId}"]`);
     if (checkEl) {
       checkEl.classList.toggle('checked', item.checked);
-      // spanでチェックマークを管理（onclickを消さないため）
       const mark = checkEl.querySelector('.check-mark');
       if (mark) mark.textContent = item.checked ? '✓' : '';
     }
     if (textEl) textEl.classList.toggle('checked-text', item.checked);
     const countEl = card.querySelector('.col-card-count');
     if (countEl) countEl.textContent = `${col.items.filter(i=>i.checked).length}/${col.items.length}`;
+  }
+  if (state.gasUrl) {
+    gasPost({action:'saveCollection', collection: col}).catch(()=>{});
   }
 }
 
@@ -2342,7 +2399,6 @@ function deleteColItem(colId, itemId) {
   if (!col) return;
   col.items = col.items.filter(i => i.id !== itemId);
   saveLocal();
-  // 削除は行ごと消すだけ（カードは開いたまま）
   const card = document.querySelector(`.col-card[data-id="${colId}"]`);
   if (card) {
     const row = card.querySelector(`.col-item[data-item-id="${itemId}"]`);
@@ -2350,11 +2406,19 @@ function deleteColItem(colId, itemId) {
     const countEl = card.querySelector('.col-card-count');
     if (countEl) countEl.textContent = `${col.items.filter(i=>i.checked).length}/${col.items.length}`;
   }
+  if (state.gasUrl) {
+    gasPost({action:'saveCollection', collection: col}).catch(()=>{});
+  }
 }
 
 function updateColNotes(colId, val) {
   const col = state.collections.find(c => c.id === colId);
-  if (col) { col.notes = val; saveLocal(); }
+  if (!col) return;
+  col.notes = val;
+  saveLocal();
+  if (state.gasUrl) {
+    gasPost({action:'saveCollection', collection: col}).catch(()=>{});
+  }
 }
 
 function renderCollections() {
@@ -2367,47 +2431,144 @@ function renderCollections() {
   }
 
   list.innerHTML = state.collections.map(col => {
-    const icon = COL_ICONS[col.type] || '📋';
-    const count = col.type === 'checklist'
-      ? `${col.items.filter(i=>i.checked).length}/${col.items.length}`
-      : (col.notes ? col.notes.length + '文字' : '');
-
-    let body = '';
-    if (col.type === 'checklist') {
-      const items = col.items.map(item => `
-        <div class="col-item" data-item-id="${item.id}">
-          <div class="col-item-check${item.checked?' checked':''}" data-item-id="${item.id}" onclick="toggleColItem('${col.id}','${item.id}')">
-            <span class="check-mark">${item.checked ? '✓' : ''}</span>
-          </div>
-          <input class="col-item-text${item.checked?' checked-text':''}" data-item-id="${item.id}" value="${escHtml(item.text)}"
-            onchange="(()=>{const c=state.collections.find(x=>x.id==='${col.id}');const i=c&&c.items.find(x=>x.id==='${item.id}');if(i){i.text=this.value;saveLocal();}})()">
-          <button class="col-item-del" onclick="deleteColItem('${col.id}','${item.id}')">✕</button>
-        </div>`).join('');
-      body = `
-        <div class="col-items">${items}</div>
-        <div class="col-add-item">
-          <span style="color:var(--ink-light);font-size:14px;">+</span>
-          <input class="col-add-input" id="col-inp-${col.id}" placeholder="項目を追加..."
-            onkeydown="if(event.key==='Enter'){addColItem('${col.id}');}">
-          <button class="col-add-go" onclick="addColItem('${col.id}')">追加</button>
-        </div>`;
-    } else {
-      body = `<textarea class="col-notes" placeholder="自由にメモ..."
-        onchange="updateColNotes('${col.id}',this.value)">${escHtml(col.notes)}</textarea>`;
-    }
-
-    return `
-      <div class="col-card" data-id="${col.id}">
-        <div class="col-card-header" onclick="toggleColCard('${col.id}')">
-          <span class="col-card-icon">${icon}</span>
-          <span class="col-card-title">${escHtml(col.title)}</span>
-          <span class="col-card-count">${count}</span>
-          <button class="col-del-btn" onclick="event.stopPropagation();deleteCollection('${col.id}')">🗑</button>
-          <span class="col-card-chevron">›</span>
-        </div>
-        <div class="col-card-body">${body}</div>
-      </div>`;
+    // （省略：上記で生成したHTML）
+    return renderColCard(col);
   }).join('');
+
+  // ドラッグソート初期化
+  state.collections.forEach(col => {
+    if (col.type === 'checklist') {
+      const itemsEl = document.getElementById('col-items-' + col.id);
+      if (itemsEl) initColItemDragSort(itemsEl, col.id);
+    }
+  });
+}
+
+function renderColCard(col) {
+  const icon = COL_ICONS[col.type] || '📋';
+  const count = col.type === 'checklist'
+    ? `${col.items.filter(i=>i.checked).length}/${col.items.length}`
+    : (col.notes ? col.notes.length + '文字' : '');
+
+  let body = '';
+  if (col.type === 'checklist') {
+    const items = col.items.map(item => `
+      <div class="col-item" data-item-id="${item.id}">
+        <span class="col-item-drag-handle" title="ドラッグで並び替え">⋮</span>
+        <div class="col-item-check${item.checked?' checked':''}" data-item-id="${item.id}" onclick="toggleColItem('${col.id}','${item.id}')">
+          <span class="check-mark">${item.checked ? '✓' : ''}</span>
+        </div>
+        <input class="col-item-text${item.checked?' checked-text':''}" data-item-id="${item.id}" value="${escHtml(item.text)}"
+          onchange="(()=>{const c=state.collections.find(x=>x.id==='${col.id}');const i=c&&c.items.find(x=>x.id==='${item.id}');if(i){i.text=this.value;saveLocal();if(state.gasUrl)gasPost({action:'saveCollection',collection:c}).catch(()=>{});}})(this)">
+        <button class="col-item-del" onclick="deleteColItem('${col.id}','${item.id}')">✕</button>
+      </div>`).join('');
+    body = `
+      <div class="col-items" id="col-items-${col.id}">${items}</div>
+      <div class="col-add-item">
+        <span style="color:var(--ink-light);font-size:14px;">+</span>
+        <input class="col-add-input" id="col-inp-${col.id}" placeholder="項目を追加..."
+          onkeydown="if(event.key==='Enter'){addColItem('${col.id}');}">
+        <button class="col-add-go" onclick="addColItem('${col.id}')">追加</button>
+      </div>`;
+  } else {
+    body = `<textarea class="col-notes" placeholder="自由にメモ..."
+      onchange="updateColNotes('${col.id}',this.value)">${escHtml(col.notes)}</textarea>`;
+  }
+
+  return `
+    <div class="col-card" data-id="${col.id}">
+      <div class="col-card-header" onclick="toggleColCard('${col.id}')">
+        <span class="col-card-icon">${icon}</span>
+        <span class="col-card-title">${escHtml(col.title)}</span>
+        <span class="col-card-count">${count}</span>
+        <button class="col-del-btn" onclick="event.stopPropagation();deleteCollection('${col.id}')">🗑</button>
+        <span class="col-card-chevron">›</span>
+      </div>
+      <div class="col-card-body">${body}</div>
+    </div>`;
+}
+
+// ─── Col Item Drag Sort ──────────────────────────────────────
+function initColItemDragSort(listEl, colId) {
+  let dragging = null;
+  let touchClone = null;
+  let touchOffsetY = 0;
+
+  listEl.querySelectorAll('.col-item').forEach(item => {
+    item.draggable = true;
+    item.addEventListener('dragstart', () => {
+      dragging = item;
+      setTimeout(() => item.classList.add('dragging'), 0);
+    });
+    item.addEventListener('dragend', () => {
+      item.classList.remove('dragging');
+      dragging = null;
+      commitColOrder(listEl, colId);
+    });
+  });
+
+  listEl.addEventListener('dragover', e => {
+    e.preventDefault();
+    if (!dragging) return;
+    const over = getColDragTarget(e.clientY, listEl);
+    if (over && over !== dragging) {
+      const mid = over.getBoundingClientRect().top + over.getBoundingClientRect().height / 2;
+      if (e.clientY < mid) listEl.insertBefore(dragging, over);
+      else listEl.insertBefore(dragging, over.nextSibling);
+    }
+  });
+
+  listEl.querySelectorAll('.col-item-drag-handle').forEach(handle => {
+    handle.addEventListener('touchstart', e => {
+      const item = handle.closest('.col-item');
+      dragging = item;
+      const touch = e.touches[0];
+      const rect = item.getBoundingClientRect();
+      touchOffsetY = touch.clientY - rect.top;
+      touchClone = item.cloneNode(true);
+      touchClone.style.cssText = `position:fixed;left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;opacity:.7;z-index:999;pointer-events:none;background:var(--paper);border:1px solid var(--accent);border-radius:4px;`;
+      document.body.appendChild(touchClone);
+      item.classList.add('dragging');
+      e.preventDefault();
+    }, {passive: false});
+
+    handle.addEventListener('touchmove', e => {
+      if (!dragging || !touchClone) return;
+      const touch = e.touches[0];
+      touchClone.style.top = (touch.clientY - touchOffsetY) + 'px';
+      const over = getColDragTarget(touch.clientY, listEl);
+      if (over && over !== dragging) {
+        const mid = over.getBoundingClientRect().top + over.getBoundingClientRect().height / 2;
+        if (touch.clientY < mid) listEl.insertBefore(dragging, over);
+        else listEl.insertBefore(dragging, over.nextSibling);
+      }
+      e.preventDefault();
+    }, {passive: false});
+
+    handle.addEventListener('touchend', () => {
+      if (touchClone) { touchClone.remove(); touchClone = null; }
+      if (dragging) { dragging.classList.remove('dragging'); dragging = null; }
+      commitColOrder(listEl, colId);
+    });
+  });
+}
+
+function getColDragTarget(clientY, listEl) {
+  return [...listEl.querySelectorAll('.col-item:not(.dragging)')].find(el => {
+    const r = el.getBoundingClientRect();
+    return clientY >= r.top && clientY <= r.bottom;
+  });
+}
+
+async function commitColOrder(listEl, colId) {
+  const col = state.collections.find(c => c.id === colId);
+  if (!col) return;
+  const ids = [...listEl.querySelectorAll('.col-item')].map(el => el.dataset.itemId);
+  col.items = ids.map(id => col.items.find(i => i.id === id)).filter(Boolean);
+  saveLocal();
+  if (state.gasUrl) {
+    try { await gasPost({action:'saveCollection', collection: col}); } catch(_) {}
+  }
 }
 
 // ─── Settings ────────────────────────────────────────────────
