@@ -1149,7 +1149,7 @@
 <header>
   <div class="header-top">
     <div class="logo">BuJo<span>.</span></div>
-    <div class="build-time">built 2026.06.23 16:37</div>
+    <div class="build-time">built 2026.06.24 10:01</div>
     <div class="date-display" id="headerDate"></div>
   </div>
   <nav>
@@ -1817,7 +1817,10 @@ async function addEntry() {
   state.entries.push(entry);
   saveLocal();
   inp.value = '';
+  inp.blur();
   renderDaily();
+  // MacのEnterキー後にブラウザが値を書き戻すことがあるため遅延クリア
+  setTimeout(() => { inp.value = ''; }, 0);
   if (state.gasUrl) {
     try { await gasPost({action:'saveEntry', ...entry}); }
     catch(e) { setStatus('dailyStatus','⚠ 保存失敗: '+e.message,'err'); }
