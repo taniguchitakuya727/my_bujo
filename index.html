@@ -1149,7 +1149,7 @@
 <header>
   <div class="header-top">
     <div class="logo">BuJo<span>.</span></div>
-    <div class="build-time">built 2026.06.24 10:01</div>
+    <div class="build-time">built 2026.07.06 07:33</div>
     <div class="date-display" id="headerDate"></div>
   </div>
   <nav>
@@ -2192,9 +2192,23 @@ function openMigrationModal() {
   migrationDecisions = {};
   const today = state.currentDate;
 
-  // 今日より前の未完了タスク（・のみ、stateがopen）
-  const pending = state.entries
-    .filter(e => e.date < today && e.sym === '・' && e.state === 'open')
+  // 今日より前の未完了エントリ
+  // ・open と > migrated の両方を対象にする
+  const allPending = state.entries.filter(e =>
+    e.date < today &&
+    ((e.sym === '・' && e.state === 'open') ||
+     (e.sym === '>' && e.state === 'migrated'))
+  );
+
+  // 同じテキストが複数日にある場合は最新日付の1件だけに絞る
+  const latestByText = {};
+  allPending.forEach(e => {
+    const key = e.text.trim();
+    if (!latestByText[key] || e.date > latestByText[key].date) {
+      latestByText[key] = e;
+    }
+  });
+  const pending = Object.values(latestByText)
     .sort((a, b) => a.date.localeCompare(b.date));
 
   const listEl = document.getElementById('migrationList');
@@ -2214,7 +2228,7 @@ function openMigrationModal() {
   });
 
   let html = '';
-  Object.keys(groups).forEach(date => {
+  Object.keys(groups).sort().forEach(date => {
     const d = new Date(date + 'T00:00:00');
     const dow = ['日','月','火','水','木','金','土'][d.getDay()];
     const label = `${d.getMonth()+1}/${d.getDate()}（${dow}）`;
@@ -2222,7 +2236,7 @@ function openMigrationModal() {
       <div class="migration-date-label">${label}</div>`;
     groups[date].forEach(e => {
       html += `<div class="migration-item" id="mig-item-${e.id}">
-        <span class="migration-item-sym">・</span>
+        <span class="migration-item-sym">${e.sym}</span>
         <span class="migration-item-text">${escHtml(e.text)}</span>
         <div class="migration-item-actions">
           <button class="mig-act-btn" data-id="${e.id}" data-action="today" onclick="setMigDecision('${e.id}','today')">今日へ</button>
@@ -2260,6 +2274,9 @@ function migrationSelectAll() {
 }
 
 async function executeMigration() {
+  const btn = document.querySelector('.migration-execute');
+  if (btn) { btn.disabled = true; btn.textContent = '実行中...'; }
+
   const today = state.currentDate;
   const promises = [];
   let movedCount = 0;
@@ -2270,9 +2287,7 @@ async function executeMigration() {
     if (!e) return;
 
     if (action === 'today') {
-      // 元エントリを > に変更
       e.sym = '>'; e.state = 'migrated';
-      // 今日に新規コピー
       const copied = { id: uid(), date: today, sym: '・', text: e.text, state: 'open' };
       state.entries.push(copied);
       movedCount++;
@@ -2285,9 +2300,9 @@ async function executeMigration() {
       deletedCount++;
       if (state.gasUrl) promises.push(gasPost({action:'deleteEntry', id}));
     }
-    // skip は何もしない
   });
 
+  migrationDecisions = {}; // 二重実行防止のため先にクリア
   saveLocal();
   await Promise.allSettled(promises);
   closeMigrationModal();
