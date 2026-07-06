@@ -3,7 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-<title>Bullet Journal</title>
+<title>BuJo.</title>
+<!-- PWA -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="BuJo.">
+<meta name="theme-color" content="#1a1611">
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;600&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+JP:wght@400;500&display=swap');
 
@@ -1152,7 +1157,7 @@
 <header>
   <div class="header-top">
     <div class="logo">BuJo<span>.</span></div>
-    <div class="build-time">built 2026.07.07 08:46</div>
+    <div class="build-time">built 2026.07.07 08:52</div>
     <div class="date-display" id="headerDate"></div>
   </div>
   <nav>
@@ -2688,6 +2693,27 @@ function init() {
 }
 
 init();
+
+// ─── Service Worker 登録 ──────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(reg => {
+        // 新しいSWが待機中なら即座に適用
+        reg.addEventListener('updatefound', () => {
+          const newSW = reg.installing;
+          newSW.addEventListener('statechange', () => {
+            if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
+              // 更新があったことをユーザーに通知
+              setStatus('dailyStatus', '🔄 アプリが更新されました。再読み込みします...', 'ok');
+              setTimeout(() => window.location.reload(), 2000);
+            }
+          });
+        });
+      })
+      .catch(err => console.log('SW登録失敗:', err));
+  });
+}
 </script>
 </body>
 </html>
