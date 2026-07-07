@@ -1150,6 +1150,20 @@
     .bullet-picker { gap: 2px; }
     .bullet-opt { width: 24px; height: 24px; font-size: 13px; }
   }
+
+  .crosspost-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--ink-light);
+    padding: 4px 2px 0;
+    cursor: pointer;
+  }
+  .crosspost-row input[type="checkbox"] {
+    width: 15px;
+    height: 15px;
+  }
 </style>
 </head>
 <body>
@@ -1201,7 +1215,12 @@
       <button class="add-btn" onclick="addEntry()">追加</button>
     </div>
 
-    <div class="migration-trigger">
+    <label class="crosspost-row">
+      <input type="checkbox" id="crosspostInboxToggle">
+      <span>Inboxにも残す</span>
+    </label>
+
+    <div class="migration-trigger" id="migrationTrigger">
       <button class="migration-btn" onclick="openMigrationModal()">📋 未完了タスクを移行</button>
     </div>
 
@@ -1261,6 +1280,16 @@
       </div>
       <button class="config-save" onclick="saveConfig()">保存して接続テスト</button>
       <div class="status-bar" id="settingsStatus"></div>
+    </div>
+
+    <div class="config-section">
+      <div class="config-title">Inbox連携</div>
+      <div class="config-row">
+        <label class="config-label">Inbox GAS URL</label>
+        <input class="config-input" id="cfgInboxUrl" placeholder="https://script.google.com/macros/s/.../exec" type="url">
+      </div>
+      <button class="config-save" onclick="saveInboxConfig()">保存</button>
+      <div class="status-bar" id="inboxCfgStatus"></div>
     </div>
 
     <div class="config-section">
@@ -1646,6 +1675,38 @@ function loadLocal() {
   } catch(e) {}
 }
 
+// ─── Inbox連携（クロスポスト） ───
+function loadInboxConfig() {
+  const url = localStorage.getItem('bujo_inboxGasUrl') || '';
+  document.getElementById('cfgInboxUrl').value = url;
+  const toggle = document.getElementById('crosspostInboxToggle');
+  toggle.checked = localStorage.getItem('bujo_crosspostInbox') === 'true';
+  toggle.addEventListener('change', () => {
+    localStorage.setItem('bujo_crosspostInbox', toggle.checked ? 'true' : 'false');
+  });
+}
+
+function saveInboxConfig() {
+  const url = document.getElementById('cfgInboxUrl').value.trim();
+  localStorage.setItem('bujo_inboxGasUrl', url);
+  setStatus('inboxCfgStatus', url ? '✓ 保存しました' : 'URLを入力してください', url ? 'ok' : 'err');
+}
+
+// Inbox GASへメモとして転記（失敗しても無視、UIはブロックしない）
+async function crosspostToInbox(text) {
+  const url = localStorage.getItem('bujo_inboxGasUrl');
+  const enabled = localStorage.getItem('bujo_crosspostInbox') === 'true';
+  if (!url || !enabled) return;
+  try {
+    await fetch(url, {
+      method: 'POST',
+      body: JSON.stringify({ type: 'inbox', topic: 'Bujo', content: text })
+    });
+  } catch(_) {
+    // 失敗しても静かに無視（Bujo側の操作は止めない）
+  }
+}
+
 // ─── GAS API ─────────────────────────────────────────────────
 async function gasCall(params) {
   if (!state.gasUrl) throw new Error('GAS URL未設定');
@@ -1762,6 +1823,10 @@ function renderDaily() {
   document.getElementById('dailyDateLabel').textContent =
     `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日（${dow}）`;
 
+  // 移行ボタンは今日を見ている時だけ表示
+  const migTrigger = document.getElementById('migrationTrigger');
+  if (migTrigger) migTrigger.style.display = (state.currentDate === todayStr()) ? '' : 'none';
+
   // orderで並び替え（orderがない場合はインデックス順）
   const entries = state.entries
     .filter(e => e.date === state.currentDate)
@@ -1829,6 +1894,7 @@ async function addEntry() {
   renderDaily();
   // MacのEnterキー後にブラウザが値を書き戻すことがあるため遅延クリア
   setTimeout(() => { inp.value = ''; }, 0);
+  crosspostToInbox(entry.text);   // トグルONならInboxにも転記（失敗しても無視）
   if (state.gasUrl) {
     try { await gasPost({action:'saveEntry', ...entry}); }
     catch(e) { setStatus('dailyStatus','⚠ 保存失敗: '+e.message,'err'); }
@@ -2648,6 +2714,7 @@ function renderAll() {
 function init() {
   loadLocal();
   document.getElementById('cfgUrl').value = state.gasUrl;
+  loadInboxConfig();
 
   const now = new Date();
   document.getElementById('headerDate').textContent =
