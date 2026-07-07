@@ -1164,6 +1164,159 @@
     width: 15px;
     height: 15px;
   }
+
+  /* ── weekly review ── */
+  .weekly-banner {
+    background: #fff3cd;
+    border: 1px solid #f0d78c;
+    border-radius: var(--radius);
+    padding: 10px 12px;
+    font-size: 13px;
+    color: #6b5a1e;
+    margin-bottom: 16px;
+    display: none;
+  }
+  .weekly-banner.show { display: block; }
+
+  .weekly-week-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: var(--ink-light);
+    margin-bottom: 20px;
+  }
+  .weekly-week-label .saved-mark {
+    color: var(--done);
+    font-weight: 600;
+  }
+
+  .weekly-q {
+    margin-bottom: 22px;
+  }
+  .weekly-q-label {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    line-height: 1.5;
+    color: var(--ink);
+  }
+  .weekly-chip-row {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+  }
+  .weekly-chip {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    padding: 6px 16px;
+    border-radius: 999px;
+    border: 1px solid var(--rule);
+    background: var(--paper-dark);
+    color: var(--ink-light);
+    cursor: pointer;
+    transition: all .1s;
+  }
+  .weekly-chip.selected {
+    background: var(--ink);
+    color: var(--paper);
+    border-color: var(--ink);
+  }
+  .weekly-day-row {
+    display: none;
+    gap: 4px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+  }
+  .weekly-day-row.show { display: flex; }
+  .weekly-day-chip {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    width: 30px; height: 30px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: var(--radius);
+    border: 1px solid var(--rule);
+    background: var(--paper-dark);
+    color: var(--ink-light);
+    cursor: pointer;
+  }
+  .weekly-day-chip.selected {
+    background: var(--accent2);
+    color: #fff;
+    border-color: var(--accent2);
+  }
+
+  .weekly-input {
+    width: 100%;
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    padding: 9px 12px;
+    font-size: 14px;
+    font-family: 'Noto Sans JP', sans-serif;
+    color: var(--ink);
+    outline: none;
+  }
+  .weekly-input:focus { border-color: var(--accent); }
+
+  .weekly-save-btn {
+    width: 100%;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius);
+    padding: 12px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: 'Noto Sans JP', sans-serif;
+    margin-top: 4px;
+  }
+  .weekly-save-btn:hover { background: #1e3f63; }
+
+  .weekly-history {
+    margin-top: 28px;
+    padding-top: 16px;
+    border-top: 1px solid var(--rule);
+  }
+  .weekly-history-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-light);
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .weekly-history-item {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 6px 0;
+    font-size: 12px;
+    color: var(--ink-light);
+    border-bottom: 1px solid var(--paper-dark);
+  }
+  .weekly-history-week {
+    font-family: 'JetBrains Mono', monospace;
+    min-width: 68px;
+    color: var(--ink);
+  }
+  .weekly-history-mark {
+    font-weight: 600;
+  }
+  .weekly-history-mark.ok { color: var(--done); }
+  .weekly-history-mark.ng { color: var(--accent2); }
+  .weekly-history-note {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .weekly-history-trend {
+    font-size: 12px;
+    color: var(--ink-light);
+    margin-top: 8px;
+    line-height: 1.6;
+  }
 </style>
 </head>
 <body>
@@ -1171,7 +1324,7 @@
 <header>
   <div class="header-top">
     <div class="logo">BuJo<span>.</span></div>
-    <div class="build-time">built 2026.07.07 08:52</div>
+    <div class="build-time">built 2026.07.07 18:53</div>
     <div class="date-display" id="headerDate"></div>
   </div>
   <nav>
@@ -1179,6 +1332,7 @@
     <button onclick="switchTab('monthly')">Monthly</button>
     <button onclick="switchTab('habit')">Habits</button>
     <button onclick="switchTab('collections')">Collect</button>
+    <button onclick="switchTab('weekly')">Weekly</button>
     <button onclick="switchTab('settings')">Settings</button>
   </nav>
 </header>
@@ -1262,6 +1416,70 @@
     </div>
     <div class="col-list" id="colList"></div>
     <div class="status-bar" id="colStatus"></div>
+  </div>
+
+  <!-- ===== WEEKLY REVIEW TAB ===== -->
+  <div class="tab" id="tab-weekly">
+    <div class="section-heading">Weekly Review</div>
+    <div class="section-sub">自覚(0番)→イネイト(1番)→AI副業(2番) が崩れていないかの週次チェック</div>
+
+    <div class="weekly-banner" id="weeklyBanner">📝 今週のレビューがまだです。1〜2分で振り返ってみましょう。</div>
+
+    <div class="weekly-week-label" id="weeklyWeekLabel"></div>
+
+    <div class="weekly-q">
+      <div class="weekly-q-label">Q0. 【自覚】今週、自覚的だった瞬間はあったか</div>
+      <div class="weekly-chip-row" id="q0AwareRow">
+        <div class="weekly-chip" data-val="有" onclick="selectWeeklyChip(this,'q0Aware')">有</div>
+        <div class="weekly-chip" data-val="無" onclick="selectWeeklyChip(this,'q0Aware')">無</div>
+      </div>
+      <input type="text" class="weekly-input" id="q0Note" placeholder="一言（任意）" onchange="saveWeeklyDraft()">
+    </div>
+
+    <div class="weekly-q">
+      <div class="weekly-q-label">Q1. 【イネイト】身体だけで手を動かした時間を確保できたか</div>
+      <div class="weekly-chip-row" id="q1InnateRow">
+        <div class="weekly-chip" data-val="○" onclick="selectWeeklyChip(this,'q1Innate')">○</div>
+        <div class="weekly-chip" data-val="△" onclick="selectWeeklyChip(this,'q1Innate')">△</div>
+        <div class="weekly-chip" data-val="×" onclick="selectWeeklyChip(this,'q1Innate')">×</div>
+      </div>
+      <input type="text" class="weekly-input" id="q1Note" placeholder="一言（任意）" onchange="saveWeeklyDraft()">
+    </div>
+
+    <div class="weekly-q">
+      <div class="weekly-q-label">Q2. 【AI副業】2番が0番・1番を侵食した日はなかったか</div>
+      <div class="weekly-chip-row" id="q2InvadedRow">
+        <div class="weekly-chip" data-val="なし" onclick="selectWeeklyChip(this,'q2Invaded')">なし</div>
+        <div class="weekly-chip" data-val="あり" onclick="selectWeeklyChip(this,'q2Invaded')">あり</div>
+      </div>
+      <div class="weekly-day-row" id="q2DayRow">
+        <div class="weekly-day-chip" data-day="月" onclick="toggleWeeklyDay(this)">月</div>
+        <div class="weekly-day-chip" data-day="火" onclick="toggleWeeklyDay(this)">火</div>
+        <div class="weekly-day-chip" data-day="水" onclick="toggleWeeklyDay(this)">水</div>
+        <div class="weekly-day-chip" data-day="木" onclick="toggleWeeklyDay(this)">木</div>
+        <div class="weekly-day-chip" data-day="金" onclick="toggleWeeklyDay(this)">金</div>
+        <div class="weekly-day-chip" data-day="土" onclick="toggleWeeklyDay(this)">土</div>
+        <div class="weekly-day-chip" data-day="日" onclick="toggleWeeklyDay(this)">日</div>
+      </div>
+    </div>
+
+    <div class="weekly-q">
+      <div class="weekly-q-label">Q3. 今週の実態は 0→1→2 の順だったか</div>
+      <div class="weekly-chip-row" id="q3OrderRow">
+        <div class="weekly-chip" data-val="守れた" onclick="selectWeeklyChip(this,'q3Order')">守れた</div>
+        <div class="weekly-chip" data-val="崩れた" onclick="selectWeeklyChip(this,'q3Order')">崩れた</div>
+      </div>
+    </div>
+
+    <div class="weekly-q">
+      <div class="weekly-q-label">Q4. 来週の一手（一つだけ）</div>
+      <input type="text" class="weekly-input" id="q4Action" placeholder="修正アクションを一つだけ" onchange="saveWeeklyDraft()">
+    </div>
+
+    <button class="weekly-save-btn" id="weeklySaveBtn" onclick="submitWeeklyReview()">保存</button>
+    <div class="status-bar" id="weeklyStatus"></div>
+
+    <div class="weekly-history" id="weeklyHistory"></div>
   </div>
 
   <!-- ===== SETTINGS TAB ===== -->
@@ -1398,6 +1616,17 @@
       </div>
 
       <div class="help-section">
+        <div class="help-section-title">Weekly — 週次レビュー</div>
+        <div class="help-section-body">
+          <p>「自覚(0番)→イネイト(1番)→AI副業(2番)」の優先順位が崩れていないかを週1回チェックします。</p>
+          <div class="help-tip">💡 質問は5つだけ、1〜2分で終わる想定です</div>
+          <div class="help-tip">💡 同じ週にもう一度保存すると、その週の内容が上書きされます</div>
+          <div class="help-tip">💡 日曜に未入力だと控えめなバナーで知らせます</div>
+          <div class="help-tip">💡 下部に直近の履歴と傾向が表示されます</div>
+        </div>
+      </div>
+
+      <div class="help-section">
         <div class="help-section-title">同期について</div>
         <div class="help-section-body">
           <p>データはGoogleスプレッドシートに保存され、複数デバイスで共有できます。</p>
@@ -1464,6 +1693,8 @@ function doGet(e) {
     if (act === 'saveOrder')         return res(saveOrder(b));
     if (act === 'saveCollection')    return res(saveCollection(b));
     if (act === 'deleteCollection')  return res(deleteCollection(b));
+    if (act === 'saveWeeklyReview')  return res(saveWeeklyReview(b));
+    if (act === 'getWeeklyReviews')  return res(getWeeklyReviews(Object.assign({}, e.parameter, b)));
     return res({error: 'unknown action: ' + act});
   } catch(err) {
     return res({error: err.message});
@@ -1631,6 +1862,48 @@ function checkHabit(b) {
   }
   s.appendRow([b.habitId, b.date, b.checked]);
   return {ok: true};
+}
+
+// 週次レビュー：同じ week の行があれば上書き、無ければ追加
+function saveWeeklyReview(b) {
+  const s = getSheet('WeeklyReview');
+  if (s.getLastRow() === 0) {
+    s.appendRow(['week','date','q0_aware','q0_note','q1_innate','q1_note','q2_invaded','q2_days','q3_order','q4_action','updatedAt']);
+  }
+  const now = new Date().toISOString();
+  const row = [
+    b.week || '', b.date || '',
+    b.q0_aware || '', b.q0_note || '',
+    b.q1_innate || '', b.q1_note || '',
+    b.q2_invaded || '', b.q2_days || '',
+    b.q3_order || '', b.q4_action || '',
+    now
+  ];
+  const rows = s.getDataRange().getValues();
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]) === String(b.week)) {
+      s.getRange(i+1, 1, 1, row.length).setValues([row]);
+      return {ok: true};
+    }
+  }
+  s.appendRow(row);
+  return {ok: true};
+}
+
+// 直近N週分を新しい順で返す（?action=getWeeklyReviews&limit=8 のような単純GETにも対応）
+function getWeeklyReviews(b) {
+  const s = getSheet('WeeklyReview');
+  if (s.getLastRow() < 2) return {reviews: []};
+  const rows = s.getDataRange().getValues();
+  const header = rows[0];
+  const limit = Number(b.limit) || 8;
+  const list = rows.slice(1).map(r => {
+    const obj = {};
+    header.forEach((h, i) => { obj[h] = r[i]; });
+    return obj;
+  });
+  list.sort((a, c) => String(c.week).localeCompare(String(a.week)));
+  return { reviews: list.slice(0, limit) };
 }`;
 
 // ─── State ───────────────────────────────────────────────────
@@ -1790,11 +2063,12 @@ function switchTab(name) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
   document.getElementById('tab-'+name).classList.add('active');
-  const tabs = ['daily','monthly','habit','collections','settings'];
+  const tabs = ['daily','monthly','habit','collections','weekly','settings'];
   document.querySelectorAll('nav button')[tabs.indexOf(name)].classList.add('active');
   if (name === 'monthly')     renderMonthly();
   if (name === 'habit')       renderHabits();
   if (name === 'collections') renderCollections();
+  if (name === 'weekly')      renderWeekly();
 }
 
 // ─── Daily ───────────────────────────────────────────────────
@@ -2709,6 +2983,213 @@ function renderAll() {
   renderMonthly();
   renderHabits();
   renderCollections();
+}
+
+// ─── Weekly Review ───────────────────────────────────────────
+// ISO週番号を "YYYY-Www" 形式で返す
+function getISOWeek(date) {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = (d.getUTCDay() + 6) % 7; // 月曜=0
+  d.setUTCDate(d.getUTCDate() - dayNum + 3); // その週の木曜に移動
+  const firstThursday = new Date(Date.UTC(d.getUTCFullYear(), 0, 4));
+  const weekNum = 1 + Math.round(
+    ((d - firstThursday) / 86400000 - 3 + ((firstThursday.getUTCDay() + 6) % 7)) / 7
+  );
+  return `${d.getUTCFullYear()}-W${String(weekNum).padStart(2, '0')}`;
+}
+
+let weeklyDraft = {
+  q0Aware: '', q0Note: '',
+  q1Innate: '', q1Note: '',
+  q2Invaded: '', q2Days: [],
+  q3Order: '',
+  q4Action: '',
+};
+let weeklyCurrentWeek = '';
+
+function selectWeeklyChip(el, field) {
+  const row = el.parentElement;
+  row.querySelectorAll('.weekly-chip').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  weeklyDraft[field] = el.dataset.val;
+
+  // Q2で「あり」を選んだ時だけ曜日チップ行を表示
+  if (field === 'q2Invaded') {
+    const dayRow = document.getElementById('q2DayRow');
+    if (el.dataset.val === 'あり') {
+      dayRow.classList.add('show');
+    } else {
+      dayRow.classList.remove('show');
+      weeklyDraft.q2Days = [];
+      document.querySelectorAll('.weekly-day-chip').forEach(c => c.classList.remove('selected'));
+    }
+  }
+  saveWeeklyDraft();
+}
+
+function toggleWeeklyDay(el) {
+  const day = el.dataset.day;
+  el.classList.toggle('selected');
+  if (el.classList.contains('selected')) {
+    if (!weeklyDraft.q2Days.includes(day)) weeklyDraft.q2Days.push(day);
+  } else {
+    weeklyDraft.q2Days = weeklyDraft.q2Days.filter(d => d !== day);
+  }
+  saveWeeklyDraft();
+}
+
+function weeklyDraftKey(week) {
+  return 'bujo_weeklyDraft_' + week;
+}
+
+function saveWeeklyDraft() {
+  weeklyDraft.q0Note = document.getElementById('q0Note').value;
+  weeklyDraft.q1Note = document.getElementById('q1Note').value;
+  weeklyDraft.q4Action = document.getElementById('q4Action').value;
+  localStorage.setItem(weeklyDraftKey(weeklyCurrentWeek), JSON.stringify(weeklyDraft));
+}
+
+function applyWeeklyDraftToForm() {
+  document.getElementById('q0Note').value = weeklyDraft.q0Note || '';
+  document.getElementById('q1Note').value = weeklyDraft.q1Note || '';
+  document.getElementById('q4Action').value = weeklyDraft.q4Action || '';
+
+  const setChip = (rowId, val) => {
+    document.querySelectorAll('#' + rowId + ' .weekly-chip').forEach(c => {
+      c.classList.toggle('selected', c.dataset.val === val);
+    });
+  };
+  setChip('q0AwareRow', weeklyDraft.q0Aware);
+  setChip('q1InnateRow', weeklyDraft.q1Innate);
+  setChip('q2InvadedRow', weeklyDraft.q2Invaded);
+  setChip('q3OrderRow', weeklyDraft.q3Order);
+
+  const dayRow = document.getElementById('q2DayRow');
+  if (weeklyDraft.q2Invaded === 'あり') {
+    dayRow.classList.add('show');
+  } else {
+    dayRow.classList.remove('show');
+  }
+  document.querySelectorAll('.weekly-day-chip').forEach(c => {
+    c.classList.toggle('selected', (weeklyDraft.q2Days || []).includes(c.dataset.day));
+  });
+}
+
+function resetWeeklyForm() {
+  weeklyDraft = {
+    q0Aware: '', q0Note: '',
+    q1Innate: '', q1Note: '',
+    q2Invaded: '', q2Days: [],
+    q3Order: '',
+    q4Action: '',
+  };
+  applyWeeklyDraftToForm();
+}
+
+async function submitWeeklyReview() {
+  const btn = document.getElementById('weeklySaveBtn');
+  saveWeeklyDraft();
+
+  const payload = {
+    action: 'saveWeeklyReview',
+    week: weeklyCurrentWeek,
+    date: todayStr(),
+    q0_aware: weeklyDraft.q0Aware,
+    q0_note: weeklyDraft.q0Note,
+    q1_innate: weeklyDraft.q1Innate,
+    q1_note: weeklyDraft.q1Note,
+    q2_invaded: weeklyDraft.q2Invaded,
+    q2_days: (weeklyDraft.q2Days || []).join('/'),
+    q3_order: weeklyDraft.q3Order,
+    q4_action: weeklyDraft.q4Action,
+  };
+
+  if (!state.gasUrl) {
+    setStatus('weeklyStatus', '⚠ GAS URLを設定してください', 'err');
+    switchTab('settings');
+    return;
+  }
+
+  btn.disabled = true;
+  setStatus('weeklyStatus', '保存中...', 'loading');
+  try {
+    const result = await gasPost(payload);
+    if (result.ok) {
+      setStatus('weeklyStatus', '✓ 保存しました', 'ok');
+      document.getElementById('weeklyBanner').classList.remove('show');
+      localStorage.removeItem(weeklyDraftKey(weeklyCurrentWeek));
+      loadWeeklyHistory();
+    } else {
+      setStatus('weeklyStatus', '⚠ 保存に失敗しました', 'err');
+    }
+  } catch (e) {
+    setStatus('weeklyStatus', '⚠ 保存失敗: ' + e.message, 'err');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function renderWeekly() {
+  weeklyCurrentWeek = getISOWeek(new Date());
+  document.getElementById('weeklyWeekLabel').textContent = `対象週：${weeklyCurrentWeek}`;
+
+  // まずローカルの下書きを復元
+  try {
+    const saved = JSON.parse(localStorage.getItem(weeklyDraftKey(weeklyCurrentWeek)) || 'null');
+    weeklyDraft = saved || {
+      q0Aware: '', q0Note: '',
+      q1Innate: '', q1Note: '',
+      q2Invaded: '', q2Days: [],
+      q3Order: '',
+      q4Action: '',
+    };
+  } catch (e) {
+    resetWeeklyForm();
+  }
+  applyWeeklyDraftToForm();
+
+  // 日曜で今週分の下書き・保存が無ければバナー表示
+  const isSunday = new Date().getDay() === 0;
+  const hasDraft = weeklyDraft.q0Aware || weeklyDraft.q1Innate || weeklyDraft.q3Order;
+  document.getElementById('weeklyBanner').classList.toggle('show', isSunday && !hasDraft);
+
+  loadWeeklyHistory();
+}
+
+async function loadWeeklyHistory() {
+  const historyEl = document.getElementById('weeklyHistory');
+  if (!state.gasUrl) {
+    historyEl.innerHTML = '';
+    return;
+  }
+  try {
+    const result = await gasGet({ action: 'getWeeklyReviews', limit: 8 });
+    const reviews = result.reviews || [];
+    if (reviews.length === 0) {
+      historyEl.innerHTML = '';
+      return;
+    }
+    const rows = reviews.map(r => {
+      const ok = r.q3_order === '守れた';
+      return `<div class="weekly-history-item">
+        <span class="weekly-history-week">${escHtml(String(r.week || ''))}</span>
+        <span class="weekly-history-mark ${ok ? 'ok' : 'ng'}">${ok ? '○ 守れた' : '× 崩れた'}</span>
+        <span class="weekly-history-note">${escHtml(String(r.q4_action || ''))}</span>
+      </div>`;
+    }).join('');
+
+    // 直近4週の傾向コメント
+    const last4 = reviews.slice(0, 4);
+    const brokenCount = last4.filter(r => r.q3_order === '崩れた').length;
+    let trend = '';
+    if (last4.length >= 2) {
+      trend = `<div class="weekly-history-trend">直近${last4.length}週中${brokenCount}週崩れ${brokenCount >= 3 ? '→一手が機能していない可能性' : ''}</div>`;
+    }
+
+    historyEl.innerHTML = `<div class="weekly-history-title">直近の履歴</div>${rows}${trend}`;
+  } catch (e) {
+    historyEl.innerHTML = '';
+  }
 }
 
 function init() {
