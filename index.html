@@ -1324,7 +1324,7 @@
 <header>
   <div class="header-top">
     <div class="logo">BuJo<span>.</span></div>
-    <div class="build-time">built 2026.07.07 18:53</div>
+    <div class="build-time">built 2026.07.15 12:00</div>
     <div class="date-display" id="headerDate"></div>
   </div>
   <nav>
@@ -1474,6 +1474,27 @@
     <div class="weekly-q">
       <div class="weekly-q-label">Q4. 来週の一手（一つだけ）</div>
       <input type="text" class="weekly-input" id="q4Action" placeholder="修正アクションを一つだけ" onchange="saveWeeklyDraft()">
+    </div>
+
+    <div class="weekly-q">
+      <div class="weekly-q-label">Q5. 【主役】今週、主役にしたプロジェクトは</div>
+      <div class="weekly-chip-row" id="q5ProjectRow">
+        <div class="weekly-chip" data-val="Innate Atlas" onclick="selectWeeklyChip(this,'q5Project')">Innate Atlas</div>
+        <div class="weekly-chip" data-val="BuJo/Inbox開発" onclick="selectWeeklyChip(this,'q5Project')">BuJo/Inbox開発</div>
+        <div class="weekly-chip" data-val="Ameblo案件" onclick="selectWeeklyChip(this,'q5Project')">Ameblo案件</div>
+        <div class="weekly-chip" data-val="AIスクール" onclick="selectWeeklyChip(this,'q5Project')">AIスクール</div>
+        <div class="weekly-chip" data-val="差取り塾" onclick="selectWeeklyChip(this,'q5Project')">差取り塾</div>
+        <div class="weekly-chip" data-val="特になし" onclick="selectWeeklyChip(this,'q5Project')">特になし</div>
+      </div>
+    </div>
+
+    <div class="weekly-q">
+      <div class="weekly-q-label">Q6. 【体力】今週の体力の余裕は</div>
+      <div class="weekly-chip-row" id="q6EnergyRow">
+        <div class="weekly-chip" data-val="あった" onclick="selectWeeklyChip(this,'q6Energy')">あった</div>
+        <div class="weekly-chip" data-val="普通" onclick="selectWeeklyChip(this,'q6Energy')">普通</div>
+        <div class="weekly-chip" data-val="キツかった" onclick="selectWeeklyChip(this,'q6Energy')">キツかった</div>
+      </div>
     </div>
 
     <button class="weekly-save-btn" id="weeklySaveBtn" onclick="submitWeeklyReview()">保存</button>
@@ -1868,7 +1889,7 @@ function checkHabit(b) {
 function saveWeeklyReview(b) {
   const s = getSheet('WeeklyReview');
   if (s.getLastRow() === 0) {
-    s.appendRow(['week','date','q0_aware','q0_note','q1_innate','q1_note','q2_invaded','q2_days','q3_order','q4_action','updatedAt']);
+    s.appendRow(['week','date','q0_aware','q0_note','q1_innate','q1_note','q2_invaded','q2_days','q3_order','q4_action','q5_project','q6_energy','updatedAt']);
   }
   const now = new Date().toISOString();
   const row = [
@@ -1877,6 +1898,7 @@ function saveWeeklyReview(b) {
     b.q1_innate || '', b.q1_note || '',
     b.q2_invaded || '', b.q2_days || '',
     b.q3_order || '', b.q4_action || '',
+    b.q5_project || '', b.q6_energy || '',
     now
   ];
   const rows = s.getDataRange().getValues();
@@ -3004,6 +3026,8 @@ let weeklyDraft = {
   q2Invaded: '', q2Days: [],
   q3Order: '',
   q4Action: '',
+  q5Project: '',
+  q6Energy: '',
 };
 let weeklyCurrentWeek = '';
 
@@ -3063,6 +3087,8 @@ function applyWeeklyDraftToForm() {
   setChip('q1InnateRow', weeklyDraft.q1Innate);
   setChip('q2InvadedRow', weeklyDraft.q2Invaded);
   setChip('q3OrderRow', weeklyDraft.q3Order);
+  setChip('q5ProjectRow', weeklyDraft.q5Project);
+  setChip('q6EnergyRow', weeklyDraft.q6Energy);
 
   const dayRow = document.getElementById('q2DayRow');
   if (weeklyDraft.q2Invaded === 'あり') {
@@ -3082,6 +3108,8 @@ function resetWeeklyForm() {
     q2Invaded: '', q2Days: [],
     q3Order: '',
     q4Action: '',
+    q5Project: '',
+    q6Energy: '',
   };
   applyWeeklyDraftToForm();
 }
@@ -3102,6 +3130,8 @@ async function submitWeeklyReview() {
     q2_days: (weeklyDraft.q2Days || []).join('/'),
     q3_order: weeklyDraft.q3Order,
     q4_action: weeklyDraft.q4Action,
+    q5_project: weeklyDraft.q5Project,
+    q6_energy: weeklyDraft.q6Energy,
   };
 
   if (!state.gasUrl) {
@@ -3142,6 +3172,8 @@ function renderWeekly() {
       q2Invaded: '', q2Days: [],
       q3Order: '',
       q4Action: '',
+      q5Project: '',
+      q6Energy: '',
     };
   } catch (e) {
     resetWeeklyForm();
@@ -3171,10 +3203,11 @@ async function loadWeeklyHistory() {
     }
     const rows = reviews.map(r => {
       const ok = r.q3_order === '守れた';
+      const proj = r.q5_project ? ` / ${escHtml(String(r.q5_project))}` : '';
       return `<div class="weekly-history-item">
         <span class="weekly-history-week">${escHtml(String(r.week || ''))}</span>
         <span class="weekly-history-mark ${ok ? 'ok' : 'ng'}">${ok ? '○ 守れた' : '× 崩れた'}</span>
-        <span class="weekly-history-note">${escHtml(String(r.q4_action || ''))}</span>
+        <span class="weekly-history-note">${escHtml(String(r.q4_action || ''))}${proj}</span>
       </div>`;
     }).join('');
 
